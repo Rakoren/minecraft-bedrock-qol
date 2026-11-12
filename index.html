@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QoL Add-on Builder</title>
+<style>
+  :root { --bg:#f6f7f4; --card:#fff; --ink:#1d2a1f; --muted:#5c6a5f; --line:#d9ded6; --accent:#3c8527; --accent-ink:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161a16; --card:#1f241f; --ink:#e8efe6; --muted:#9aa89c; --line:#323a32; --accent:#5ab341; --accent-ink:#0e140e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  p.lead { margin:0 0 20px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:4px 16px; margin-bottom:16px; }
+  label.mod { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  label.mod:last-child { border-bottom:0; }
+  label.mod input { margin-top:5px; width:18px; height:18px; accent-color:var(--accent); flex:none; }
+  .name { font-weight:600; }
+  .desc { color:var(--muted); font-size:.92rem; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  button, .linkbtn { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:8px; padding:8px 14px; cursor:pointer; }
+  button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; padding:10px 18px; }
+  button.primary:disabled { opacity:.5; cursor:not-allowed; }
+  input[type=text] { font:inherit; width:7.5em; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  .summary { color:var(--muted); margin-left:auto; font-size:.92rem; }
+  ol { padding-left:1.2em; color:var(--muted); }
+  ol li { margin-bottom:4px; }
+  .err { color:#c0392b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>QoL Add-on Builder</h1>
+  <p class="lead">Pick the features you want, then download a pack with only those. Everything is built in your browser; nothing is uploaded.</p>
+
+  <div class="row">
+    <button type="button" id="all">Select all</button>
+    <button type="button" id="none">Select none</button>
+    <button type="button" id="defaults">Defaults</button>
+    <span class="summary" id="summary"></span>
+  </div>
+
+  <div class="card" id="modules"></div>
+
+  <div class="row">
+    <label for="version">Pack version</label>
+    <input type="text" id="version" inputmode="numeric" aria-describedby="vhelp">
+    <span class="desc" id="vhelp">Bump it every upload so devices don't keep a cached copy.</span>
+  </div>
+
+  <div class="row">
+    <button type="button" class="primary" id="build">Download .mcaddon</button>
+    <span id="status" class="desc" role="status"></span>
+  </div>
+
+  <h2>Install</h2>
+  <ol>
+    <li>Open the downloaded <code>.mcaddon</code>; Minecraft imports it.</li>
+    <li>Create or edit a world, then Behavior Packs, and activate <b>QoL Add-on</b>.</li>
+    <li>For a Realm, upload that world (Realms settings, Replace world). Switch players download the pack when they join.</li>
+    <li>In game, use a clock for the menu. Each feature can be switched off per player in its Settings page.</li>
+  </ol>
+</main>
+
+<script src="bundle.js"></script>
+<script>
+  const { buildAddon } = window.QOL_BUILDER;
+  const pack = window.QOL_PACK;
+  const mods = pack.modules.filter((m) => m.hasCode && !m.dev);
+  const $ = (id) => document.getElementById(id);
+  const box = $("modules");
+
+  for (const m of mods) {
+    const label = document.createElement("label");
+    label.className = "mod";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = m.id;
+    input.checked = m.default;
+    const text = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = m.name;
+    const desc = document.createElement("div");
+    desc.className = "desc";
+    desc.textContent = m.description;
+    text.append(name, desc);
+    label.append(input, text);
+    box.append(label);
+  }
+  const inputs = () => [...box.querySelectorAll("input")];
+  const chosen = () => inputs().filter((i) => i.checked).map((i) => i.value);
+  const update = () => {
+    $("summary").textContent = `${chosen().length} of ${mods.length} selected`;
+    $("build").disabled = chosen().length === 0;
+  };
+  box.addEventListener("change", update);
+  $("all").onclick = () => { inputs().forEach((i) => (i.checked = true)); update(); };
+  $("none").onclick = () => { inputs().forEach((i) => (i.checked = false)); update(); };
+  $("defaults").onclick = () => { inputs().forEach((i) => (i.checked = mods.find((m) => m.id === i.value).default)); update(); };
+
+  const base = JSON.parse(pack.manifest).header.version;
+  const parse = (s) => {
+    const parts = s.trim().split(".").map(Number);
+    return parts.length === 3 && parts.every((n) => Number.isInteger(n) && n >= 0 && n < 100000) ? parts : null;
+  };
+  const stored = parse(localStorage.getItem("qol-next-version") ?? "");
+  $("version").value = (stored ?? [base[0], base[1], base[2] + 1]).join(".");
+
+  $("build").onclick = () => {
+    const status = $("status");
+    status.classList.remove("err");
+    const version = parse($("version").value);
+    if (!version) {
+      status.textContent = "Version must look like 1.2.3.";
+      status.classList.add("err");
+      return;
+    }
+    const bytes = buildAddon(pack, chosen(), version);
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `QoL-${version.join(".")}.mcaddon`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    const next = [version[0], version[1], version[2] + 1].join(".");
+    localStorage.setItem("qol-next-version", next);
+    $("version").value = next;
+    status.textContent = `Built ${a.download} with ${chosen().length} features.`;
+  };
+
+  update();
+</script>
+</body>
+</html>

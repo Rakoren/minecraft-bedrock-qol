@@ -1,13 +1,12 @@
-# Site (future)
+# Site
 
-Static page, hosted free on GitHub Pages. No server.
+Static page, no server: pick features, download a custom `.mcaddon`. Hosts free on GitHub Pages, or just open `index.html` from disk.
 
-Plan:
-1. Load `modules.json`, render a checkbox per module.
-2. On download, bundle the selected modules plus core into a zip in the browser (JSZip).
-3. Generate `main.js` importing only the selected modules, and fill in the manifest.
-4. Output a `.mcaddon` / `.mcpack`.
+Files:
+- `index.html`: the page (one checkbox per module from `modules.json`, pack version box, download button).
+- `builder.js`: the build logic (generate `modules/index.js`, set the manifest version, write a zip). Shared with `tools/gen-index.mjs`, so the site and the CLI always generate the same index.
+- `bundle.js`: **generated** by `npm run site` (pack files + modules.json + builder.js in one classic script, so it works on file:// where browsers block module imports). Commit it so Pages can serve it.
 
-Pack contents are chosen at build time. Live toggles stay in the in-game settings form.
+After changing any pack file or `modules.json`, run `npm run site` and commit `bundle.js`.
 
-Not started. Depends on M1-M5 being stable first.
+Pack contents are chosen at build time; live toggles stay in the in-game settings form. Dev modules (`"dev": true`, like `hello`) are never offered.
