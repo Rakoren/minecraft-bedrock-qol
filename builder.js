@@ -1,6 +1,7 @@
 // Pure build logic shared by the website and tools/gen-index.mjs: generate
-// modules/index.js for a chosen module set, rewrite the manifest version, and
-// zip the result. No DOM or Node APIs, so it runs in both.
+// modules/index.js for a chosen module set, fill in the manifest's pack
+// settings (the gear on the Behavior Packs screen), set the version, and zip
+// the result. No DOM or Node APIs, so it runs in both.
 
 const identOf = (id) => id.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 
@@ -16,6 +17,32 @@ export default [${included.map((m) => identOf(m.id)).join(", ")}];
 `;
 }
 
+/** Pack setting name for a module's world switch, or one of its world fields. */
+const packSettingName = (id, key) => `qol:${id.replace(/-/g, "_")}${key ? `_${key}` : ""}`;
+
+/**
+ * Manifest v3 "settings" for the included modules: a world-wide on/off per
+ * module (`qol:tree_felling`) plus any world fields from modules.json
+ * (`qol:tree_felling_cap`). One colon, no hyphens, to stay a plain identifier.
+ * Read in game by core/world.js via world.getPackSettings().
+ * @param {Array<{id: string, name: string, world?: Array<any>}>} included
+ */
+function generatePackSettings(included) {
+  const settings = [
+    { type: "label", text: "World-wide switches (world owner only). Each player picks their own settings in game: sneak + jump." },
+  ];
+  for (const m of included) {
+    settings.push({ type: "toggle", text: m.name, name: packSettingName(m.id), default: true });
+  }
+  const fields = included.flatMap((m) => (m.world ?? []).map((f) => ({ m, f })));
+  if (fields.length) settings.push({ type: "label", text: "World limits (players can lower these, never raise them)" });
+  for (const { m, f } of fields) {
+    const { key, ...rest } = f;
+    settings.push({ ...rest, name: packSettingName(m.id, key) });
+  }
+  return settings;
+}
+
 /**
  * @param {{ manifest: string, modules: Array<any>, files: Record<string, string> }} pack
  * @param {string[]} selectedIds
@@ -27,8 +54,11 @@ function buildPackFiles(pack, selectedIds, version) {
   const included = pack.modules.filter((m) => chosen.has(m.id) && m.hasCode);
 
   const manifest = JSON.parse(pack.manifest);
-  manifest.header.version = version;
-  for (const mod of manifest.modules) mod.version = version;
+  // Manifest v3 wants "1.2.3" strings; v2 wants [1, 2, 3].
+  const v = manifest.format_version >= 3 ? version.join(".") : version;
+  manifest.header.version = v;
+  for (const mod of manifest.modules) mod.version = v;
+  if (manifest.format_version >= 3) manifest.settings = generatePackSettings(included);
 
   const out = [{ path: "manifest.json", data: JSON.stringify(manifest, null, 2) + "\n" }];
   for (const [path, data] of Object.entries(pack.files)) {
@@ -125,4 +155,4 @@ function buildAddon(pack, selectedIds, version, folder = "QoL_BP") {
   return makeZip(files.map((f) => ({ path: `${folder}/${f.path}`, data: f.data })));
 }
 
-export { generateIndex, buildPackFiles, crc32, makeZip, buildAddon };
+export { generateIndex, generatePackSettings, buildPackFiles, crc32, makeZip, buildAddon };

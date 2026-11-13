@@ -102,7 +102,8 @@
   $("none").onclick = () => { inputs().forEach((i) => (i.checked = false)); update(); };
   $("defaults").onclick = () => { inputs().forEach((i) => (i.checked = mods.find((m) => m.id === i.value).default)); update(); };
 
-  const base = JSON.parse(pack.manifest).header.version;
+  const hv = JSON.parse(pack.manifest).header.version;
+  const base = typeof hv === "string" ? hv.split(".").map(Number) : hv;
   const parse = (s) => {
     const parts = s.trim().split(".").map(Number);
     return parts.length === 3 && parts.every((n) => Number.isInteger(n) && n >= 0 && n < 100000) ? parts : null;
