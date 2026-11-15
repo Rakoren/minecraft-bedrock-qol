@@ -1,12 +1,12 @@
-# Site
+# QoL Add-on Builder
 
-Static page, no server: pick features, download a custom `.mcaddon`. Hosts free on GitHub Pages, or just open `index.html` from disk.
+**Live at https://rakoren.github.io/qol-builder/**
+
+A static page, no server: pick the features you want for a vanilla-feeling Minecraft Bedrock QoL add-on and download a custom `.mcaddon`. The pack is built in your browser. You can also open `index.html` straight from disk.
 
 Files:
-- `index.html`: the page (one checkbox per module from `modules.json`, pack version box, download button).
-- `builder.js`: the build logic (generate `modules/index.js`, set the manifest version, write a zip). Shared with `tools/gen-index.mjs`, so the site and the CLI always generate the same index.
-- `bundle.js`: **generated** by `npm run site` (pack files + modules.json + builder.js in one classic script, so it works on file:// where browsers block module imports). Commit it so Pages can serve it.
+- `index.html`: the picker page. Features are tiles grouped by category, there's a share link (`#m=id,id`), you can load an old `.mcaddon` to re-pick its features, and the install steps are at the bottom.
+- `builder.js`: the build logic. It generates `modules/index.js`, fills in the pack settings and version, and writes the zip.
+- `bundle.js`: **generated**. It holds the pack files, the module list and `builder.js` in one classic script, so the page works on `file://`.
 
-After changing any pack file or `modules.json`, run `npm run site` and commit `bundle.js`.
-
-Pack contents are chosen at build time; live toggles stay in the in-game settings form. Dev modules (`"dev": true`, like `hello`) are never offered.
+This repo is published from the add-on's source repo with `npm run publish-site`. Don't edit it here.
