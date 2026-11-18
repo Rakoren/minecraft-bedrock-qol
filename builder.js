@@ -149,10 +149,28 @@ function makeZip(entries) {
   return zip;
 }
 
-/** `.mcaddon`: a zip holding the behavior pack folder. */
-function buildAddon(pack, selectedIds, version, folder = "QoL_BP") {
-  const files = buildPackFiles(pack, selectedIds, version);
-  return makeZip(files.map((f) => ({ path: `${folder}/${f.path}`, data: f.data })));
+/** True if any chosen module needs the companion resource pack (overlay particles). */
+function needsResourcePack(pack, selectedIds) {
+  const chosen = new Set(selectedIds);
+  return pack.modules.some((m) => chosen.has(m.id) && m.resources);
 }
 
-export { generateIndex, generatePackSettings, buildPackFiles, crc32, makeZip, buildAddon };
+/** `.mcaddon`: a zip holding the behavior pack folder, plus the resource pack folder if needed. */
+function buildAddon(pack, selectedIds, version, folder = "QoL_BP") {
+  const files = buildPackFiles(pack, selectedIds, version).map((f) => ({ path: `${folder}/${f.path}`, data: f.data }));
+  if (pack.resourcePack && needsResourcePack(pack, selectedIds)) {
+    for (const [path, data] of Object.entries(pack.resourcePack)) {
+      if (path === "manifest.json") {
+        const m = JSON.parse(data);
+        m.header.version = version;
+        for (const mod of m.modules) mod.version = version;
+        files.push({ path: "QoL_RP/manifest.json", data: JSON.stringify(m, null, 2) + "\n" });
+      } else {
+        files.push({ path: `QoL_RP/${path}`, data });
+      }
+    }
+  }
+  return makeZip(files);
+}
+
+export { generateIndex, generatePackSettings, buildPackFiles, crc32, makeZip, buildAddon, needsResourcePack };
