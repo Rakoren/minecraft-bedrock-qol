@@ -88,6 +88,15 @@ function crc32(bytes) {
 }
 
 /** Store-only zip (no compression: the pack is tiny). Fixed timestamp so builds are reproducible. */
+/** A bundled file's contents: text as-is, binary ({ base64 }) as bytes. */
+function fileBytes(data) {
+  if (typeof data === "string" || data instanceof Uint8Array) return data;
+  const bin = atob(data.base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 function makeZip(entries) {
   const enc = new TextEncoder();
   const DOS_DATE = ((2026 - 1980) << 9) | (1 << 5) | 1;
@@ -97,7 +106,8 @@ function makeZip(entries) {
 
   for (const { path, data } of entries) {
     const name = enc.encode(path);
-    const bytes = typeof data === "string" ? enc.encode(data) : data;
+    const raw = fileBytes(data);
+    const bytes = typeof raw === "string" ? enc.encode(raw) : raw;
     const crc = crc32(bytes);
 
     const local = new DataView(new ArrayBuffer(30));
